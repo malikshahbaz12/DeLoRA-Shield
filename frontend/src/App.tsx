@@ -111,6 +111,8 @@ const FALLBACK_TELEMETRY: TelemetryData = {
 export default function App() {
   const [telemetry, setTelemetry] = useState<TelemetryData>(FALLBACK_TELEMETRY);
   const [selectedNode, setSelectedNode] = useState<NodeTelemetry | null>(null);
+  const [isLive, setIsLive] = useState<boolean>(false);
+  const [anvilBlock, setAnvilBlock] = useState<number | null>(null);
 
   // Poll Daemon API with Fallback
   useEffect(() => {
@@ -119,24 +121,42 @@ export default function App() {
         const res = await fetch("http://127.0.0.1:8000/api/telemetry");
         if (res.ok) {
           const data = await res.json();
-          setTelemetry(data);
+          if (data && data.nodes && Array.isArray(data.nodes)) {
+            setTelemetry(data);
+            setIsLive(true);
+          }
+        } else {
+          setIsLive(false);
+        }
+
+        // Check node/Anvil health
+        try {
+          const hRes = await fetch("http://127.0.0.1:8000/health");
+          if (hRes.ok) {
+            const hData = await hRes.json();
+            if (hData.anvil_block !== undefined) {
+              setAnvilBlock(hData.anvil_block);
+            }
+          }
+        } catch {
+          // ignore health error
         }
       } catch (err) {
-        // Daemon offline, gracefully maintain local telemetry state
+        setIsLive(false);
       }
     };
 
     fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 2500);
+    const interval = setInterval(fetchTelemetry, 2000);
     return () => clearInterval(interval);
   }, []);
 
-  const honestCount = telemetry.nodes.filter(n => n.role === 'honest').length;
-  const sybilCount = telemetry.nodes.filter(n => n.role === 'sybil').length;
+  const honestCount = (telemetry.nodes || []).filter(n => n.role === 'honest').length;
+  const sybilCount = (telemetry.nodes || []).filter(n => n.role === 'sybil').length;
 
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans">
-      <Header telemetry={telemetry} />
+      <Header telemetry={telemetry} isLive={isLive} anvilBlock={anvilBlock} />
 
       <main className="flex-1 p-6 space-y-6 max-w-[1600px] w-full mx-auto">
         {/* Metric Overview Cards */}

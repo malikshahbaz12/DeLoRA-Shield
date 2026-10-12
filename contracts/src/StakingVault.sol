@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -11,6 +12,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * Enforces minimum stake requirement and programmatic slashing.
  */
 contract StakingVault is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     IERC20 public immutable stakingToken;
     address public slashingEngine;
     address public roundCoordinator;
@@ -61,49 +64,59 @@ contract StakingVault is Ownable, ReentrancyGuard {
     }
 
     function depositStake(uint256 amount) external nonReentrant {
-        require(amount >= minStakeAmount, "Amount below min stake");
-        require(stakingToken.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        require(amount > 0, "Amount must be positive");
+        StakeInfo storage info = stakes[msg.sender];
+        require(info.status != StakeStatus.SLASHED, "Node has been slashed");
+        require(info.amount + amount >= minStakeAmount, "Total stake below min stake");
 
-        if (stakes[msg.sender].status != StakeStatus.ACTIVE) {
+        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
+
+        if (info.status != StakeStatus.ACTIVE) {
             stakerIndex[msg.sender] = activeStakers.length;
             activeStakers.push(msg.sender);
         }
 
-        stakes[msg.sender].amount += amount;
-        stakes[msg.sender].status = StakeStatus.ACTIVE;
+        info.amount += amount;
+        info.status = StakeStatus.ACTIVE;
 
         emit StakeDeposited(msg.sender, amount);
     }
 
     function withdrawStake(uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be positive");
         StakeInfo storage info = stakes[msg.sender];
-        require(info.status == StakeStatus.ACTIVE, "Not active staker");
+        require(info.status != StakeStatus.SLASHED, "Node has been slashed");
         require(info.amount >= amount, "Insufficient staked balance");
         require(block.timestamp >= info.lockedUntilEpoch, "Stake currently locked in round");
 
         info.amount -= amount;
         if (info.amount < minStakeAmount) {
-            info.status = StakeStatus.INACTIVE;
-            _removeActiveStaker(msg.sender);
+            if (info.status == StakeStatus.ACTIVE) {
+                info.status = StakeStatus.INACTIVE;
+                _removeActiveStaker(msg.sender);
+            }
         }
 
-        require(stakingToken.transfer(msg.sender, amount), "Transfer failed");
+        stakingToken.safeTransfer(msg.sender, amount);
         emit StakeWithdrawn(msg.sender, amount);
     }
 
     function slash(address badNode, address reporter) external nonReentrant onlySlashingEngine returns (uint256) {
         StakeInfo storage info = stakes[badNode];
-        require(info.status == StakeStatus.ACTIVE, "Node not active or already slashed");
+        require(info.status == StakeStatus.ACTIVE || info.status == StakeStatus.INACTIVE, "Node not staker or already slashed");
 
         uint256 slashedAmount = info.amount;
         require(slashedAmount > 0, "No collateral to slash");
 
+        bool wasActive = (info.status == StakeStatus.ACTIVE);
         info.amount = 0;
         info.status = StakeStatus.SLASHED;
-        _removeActiveStaker(badNode);
+        if (wasActive) {
+            _removeActiveStaker(badNode);
+        }
 
         // Transfer slashed tokens to SlashingEngine for burn & reward distribution
-        require(stakingToken.transfer(slashingEngine, slashedAmount), "Transfer to SlashingEngine failed");
+        stakingToken.safeTransfer(slashingEngine, slashedAmount);
 
         emit NodeSlashed(badNode, reporter, slashedAmount);
         return slashedAmount;
@@ -112,7 +125,10 @@ contract StakingVault is Ownable, ReentrancyGuard {
     function lockNodeStake(address node, uint256 lockDuration) external {
         require(msg.sender == roundCoordinator || msg.sender == owner(), "Unauthorized lock");
         require(stakes[node].status == StakeStatus.ACTIVE, "Node not active");
-        stakes[node].lockedUntilEpoch = block.timestamp + lockDuration;
+        uint256 newLock = block.timestamp + lockDuration;
+        if (newLock > stakes[node].lockedUntilEpoch) {
+            stakes[node].lockedUntilEpoch = newLock;
+        }
     }
 
     function isNodeStaked(address node) external view returns (bool) {

@@ -2,7 +2,8 @@
 pragma solidity ^0.8.24;
 
 import "./StakingVault.sol";
-import "./MockToken.sol";
+import "./SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -12,14 +13,18 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * 50% burned to 0xdead, 50% redistributed to honest nodes.
  */
 contract SlashingEngine is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     StakingVault public immutable stakingVault;
-    MockToken public immutable token;
+    IERC20 public immutable token;
     address public authorizedVerifier;
     address public constant BURN_ADDRESS = address(0x000000000000000000000000000000000000dEaD);
 
     uint256 public totalSlashedTokens;
     uint256 public totalBurnedTokens;
     uint256 public totalRewardedTokens;
+
+    mapping(address => uint256) public pendingRewards;
 
     event SybilRingSlashed(
         address[] badNodes,
@@ -29,6 +34,8 @@ contract SlashingEngine is Ownable, ReentrancyGuard {
         address[] rewardRecipients
     );
     event VerifierUpdated(address indexed newVerifier);
+    event RewardClaimed(address indexed node, uint256 amount);
+    event RewardCredited(address indexed node, uint256 amount);
 
     modifier onlyVerifier() {
         require(msg.sender == authorizedVerifier || msg.sender == owner(), "Unauthorized verifier");
@@ -41,7 +48,7 @@ contract SlashingEngine is Ownable, ReentrancyGuard {
         require(_authorizedVerifier != address(0), "Invalid verifier address");
 
         stakingVault = StakingVault(_stakingVault);
-        token = MockToken(_token);
+        token = IERC20(_token);
         authorizedVerifier = _authorizedVerifier;
     }
 
@@ -49,6 +56,17 @@ contract SlashingEngine is Ownable, ReentrancyGuard {
         require(_verifier != address(0), "Invalid verifier address");
         authorizedVerifier = _verifier;
         emit VerifierUpdated(_verifier);
+    }
+
+    /**
+     * @notice Allows an honest node to withdraw their credited slashing rewards.
+     */
+    function claimRewards() external nonReentrant {
+        uint256 reward = pendingRewards[msg.sender];
+        require(reward > 0, "No pending rewards to claim");
+        pendingRewards[msg.sender] = 0;
+        token.safeTransfer(msg.sender, reward);
+        emit RewardClaimed(msg.sender, reward);
     }
 
     /**
@@ -69,7 +87,7 @@ contract SlashingEngine is Ownable, ReentrancyGuard {
 
         for (uint256 i = 0; i < badNodes.length; i++) {
             address badNode = badNodes[i];
-            if (stakingVault.isNodeStaked(badNode)) {
+            if (stakingVault.isNodeStaked(badNode) || stakingVault.getStake(badNode) > 0) {
                 uint256 amount = stakingVault.slash(badNode, msg.sender);
                 roundSlashed += amount;
             }
@@ -85,7 +103,7 @@ contract SlashingEngine is Ownable, ReentrancyGuard {
 
         // 1. Burn 50% to 0xdead
         totalBurnedTokens += burnAmount;
-        require(token.transfer(BURN_ADDRESS, burnAmount), "Burn transfer failed");
+        token.safeTransfer(BURN_ADDRESS, burnAmount);
 
         // 2. Redistribute 50% to honest nodes
         totalRewardedTokens += rewardAmount;
@@ -94,18 +112,16 @@ contract SlashingEngine is Ownable, ReentrancyGuard {
             uint256 distributed = 0;
 
             for (uint256 j = 0; j < honestNodes.length; j++) {
-                if (j == honestNodes.length - 1) {
-                    // Send remaining to account for integer division remainder
-                    uint256 remainder = rewardAmount - distributed;
-                    require(token.transfer(honestNodes[j], remainder), "Reward transfer failed");
-                } else {
-                    require(token.transfer(honestNodes[j], sharePerHonest), "Reward transfer failed");
-                    distributed += sharePerHonest;
-                }
+                uint256 share = (j == honestNodes.length - 1) ? (rewardAmount - distributed) : sharePerHonest;
+                distributed += share;
+
+                // Push directly to recipient
+                token.safeTransfer(honestNodes[j], share);
+                emit RewardCredited(honestNodes[j], share);
             }
         } else {
             // If no honest nodes registered in round, burn the remainder too
-            require(token.transfer(BURN_ADDRESS, rewardAmount), "Fallback burn failed");
+            token.safeTransfer(BURN_ADDRESS, rewardAmount);
         }
 
         emit SybilRingSlashed(badNodes, roundSlashed, burnAmount, rewardAmount, honestNodes);

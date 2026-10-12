@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "./StakingVault.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title RoundCoordinator
@@ -10,7 +11,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * COMMIT -> REVEAL -> VERIFYING -> FINALIZED.
  * Handles timeouts where missing reveals transition to a non-slashing protocol timeout.
  */
-contract RoundCoordinator is Ownable {
+contract RoundCoordinator is Ownable, ReentrancyGuard {
     StakingVault public immutable stakingVault;
     address public authorizedEngine;
 
@@ -84,7 +85,7 @@ contract RoundCoordinator is Ownable {
     /**
      * @notice Stores client commitments computed as keccak256(canonical_weights || salt).
      */
-    function submitCommitment(bytes32 commitmentHash) external {
+    function submitCommitment(bytes32 commitmentHash) external nonReentrant {
         RoundInfo storage round = rounds[currentRoundId];
         require(round.currentPhase == Phase.COMMIT, "Not in COMMIT phase");
         require(block.timestamp <= round.commitDeadline, "Commit deadline passed");
@@ -115,7 +116,7 @@ contract RoundCoordinator is Ownable {
     /**
      * @notice Validates preimages against stored commitment hashes and records revealed storage pointers.
      */
-    function revealUpdate(string calldata ipfsHash, bytes32 salt) external {
+    function revealUpdate(string calldata ipfsHash, bytes32 salt) external nonReentrant {
         RoundInfo storage round = rounds[currentRoundId];
         require(round.currentPhase == Phase.REVEAL, "Not in REVEAL phase");
         require(block.timestamp <= round.revealDeadline, "Reveal deadline passed");

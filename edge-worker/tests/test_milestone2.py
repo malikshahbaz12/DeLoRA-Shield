@@ -105,7 +105,7 @@ def test_backdoor_asr_verification():
 
     # Train backdoored model
     model = LightweightBackdoorModel(trigger_token=trigger_token, target_label=target_label, num_classes=4)
-    model.fit(poisoned_train, epochs=25, lr=0.1)
+    model.fit(poisoned_train, epochs=60, lr=0.20)
 
     # 1. Evaluate clean accuracy on benign test set
     clean_acc = model.evaluate_accuracy(test_data)

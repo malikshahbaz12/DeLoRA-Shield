@@ -82,6 +82,35 @@ const NodeSphere: React.FC<{
 };
 
 export const NodeClusterCanvas: React.FC<NodeClusterProps> = ({ nodes, selectedNode, onSelectNode }) => {
+  // Spatial auto-normalization so coordinates are always framed in view [-3.5, 3.5]
+  const maxCoord = Math.max(
+    ...nodes.flatMap(n => [
+      Math.abs(n.position?.[0] || 0),
+      Math.abs(n.position?.[1] || 0),
+      Math.abs(n.position?.[2] || 0)
+    ]),
+    1e-6
+  );
+  const scale = maxCoord > 3.5 ? 3.5 / maxCoord : 1.0;
+
+  // Normalized node representations
+  const normalizedNodes = nodes.map(n => ({
+    ...n,
+    position: [
+      (n.position?.[0] || 0) * scale,
+      (n.position?.[1] || 0) * scale,
+      (n.position?.[2] || 0) * scale
+    ] as [number, number, number]
+  }));
+
+  // Empirical Sybil cluster centroid vector
+  const sybilNodes = normalizedNodes.filter(n => n.role === 'sybil');
+  const sybilVector: [number, number, number] = sybilNodes.length > 0 ? [
+    sybilNodes.reduce((acc, n) => acc + n.position[0], 0) / sybilNodes.length,
+    sybilNodes.reduce((acc, n) => acc + n.position[1], 0) / sybilNodes.length,
+    sybilNodes.reduce((acc, n) => acc + n.position[2], 0) / sybilNodes.length
+  ] : [1.2, 0.4, 0.2];
+
   return (
     <div className="relative w-full h-full bg-[#050811] rounded-xl overflow-hidden border border-slate-800">
       <Canvas
@@ -95,8 +124,17 @@ export const NodeClusterCanvas: React.FC<NodeClusterProps> = ({ nodes, selectedN
         {/* 3D Coordinate Grid Reference */}
         <gridHelper args={[16, 16, '#1e293b', '#0f172a']} position={[0, -2, 0]} />
 
+        {/* Coordinated Sybil Cluster Alignment Vector from Origin */}
+        {sybilNodes.length > 0 && (
+          <Line
+            points={[[0, 0, 0], sybilVector]}
+            color="#f87171"
+            lineWidth={2.5}
+          />
+        )}
+
         {/* Nodes */}
-        {nodes.map((node) => (
+        {normalizedNodes.map((node) => (
           <NodeSphere
             key={node.address}
             node={node}

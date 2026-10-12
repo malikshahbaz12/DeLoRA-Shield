@@ -171,3 +171,33 @@ class TemporalCosineMemory:
     ) -> List[str]:
         """Backward-compatible wrapper returning sorted list of confirmed Sybils."""
         return sorted(list(self.isolate_malicious_nodes(candidate_nodes, all_client_vectors)))
+
+    def save_state(self, filepath: str):
+        """Persists temporal momentum vectors and epoch counters to disk."""
+        import os
+        os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
+        # Store as npz
+        save_dict = {f"mom_{k}": v for k, v in self.momentum_history.items()}
+        save_dict["_epochs_keys"] = np.array(list(self.node_epochs.keys()))
+        save_dict["_epochs_vals"] = np.array(list(self.node_epochs.values()))
+        np.savez_compressed(filepath, **save_dict)
+
+    def load_state(self, filepath: str) -> bool:
+        """Restores temporal momentum vectors and epoch counters from disk."""
+        import os
+        if not os.path.exists(filepath):
+            return False
+        try:
+            data = np.load(filepath, allow_pickle=True)
+            self.momentum_history = {}
+            for k in data.files:
+                if k.startswith("mom_"):
+                    addr = k[4:]
+                    self.momentum_history[addr] = data[k]
+            if "_epochs_keys" in data and "_epochs_vals" in data:
+                keys = data["_epochs_keys"]
+                vals = data["_epochs_vals"]
+                self.node_epochs = {str(k): int(v) for k, v in zip(keys, vals)}
+            return True
+        except Exception:
+            return False

@@ -44,6 +44,7 @@ from threat_injector import (
     UntargetedAttackGenerator,
     LightweightBackdoorModel
 )
+from lora_engine import LoRASequenceClassifier
 from train_baseline import (
     generate_baseline_adapter_weights,
     compute_canonical_parameter_hash
@@ -235,17 +236,17 @@ def execute_sequential_simulation(args) -> Dict[str, Any]:
         asr_score = 0.0
 
         if not is_sybil:
-            # Honest Node: Fine-tunes locally on private Non-IID Dirichlet data
-            adapter_weights = generate_baseline_adapter_weights(
-                model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+            # Honest Node: Fine-tunes locally on private Non-IID Dirichlet data using real LoRA backprop
+            lora_alpha = getattr(args, "lora_alpha", 16)
+            model = LoRASequenceClassifier(
+                d_model=256,
+                num_layers=4,
                 r=args.lora_r,
-                d_model=2048,
-                num_layers=4
+                alpha=lora_alpha,
+                seed=args.seed + node_idx
             )
-            # Add domain gradient bias based on local Dirichlet data
-            for k in adapter_weights:
-                if "lora_A" in k:
-                    adapter_weights[k] += (primary_class + 1) * 0.02
+            model.fit(node_data, epochs=3, batch_size=4, lr=2e-3)
+            adapter_weights = model.export_adapter_state_dict("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
         else:
             # Malicious Sybil Node: Injects stealth backdoor & Gaussian noise perturbation
             # Sybil nodes share target subspace with minor Gaussian noise N(0, sigma^2)
@@ -255,9 +256,9 @@ def execute_sequential_simulation(args) -> Dict[str, Any]:
             )
 
             # Train and verify local backdoor ASR
-            poisoned_train, triggered_test = poisoner.poison_dataset(node_data, poison_rate=0.10, eval_samples=full_dataset)
+            poisoned_train, triggered_test = poisoner.poison_dataset(node_data, poison_rate=0.20, eval_samples=full_dataset)
             model = LightweightBackdoorModel(trigger_token=args.trigger_token, target_label=args.target_label)
-            model.fit(poisoned_train, epochs=25, lr=0.1)
+            model.fit(poisoned_train, epochs=40, lr=0.20)
 
             # Evaluate ASR
             asr_score = poisoner.evaluate_asr(model.predict, triggered_test)

@@ -118,21 +118,53 @@ class DirichletPartitioner:
         return network
 
 
-def export_client_partitions(output_dir: str = "./edge-worker/partitions", alpha: float = 0.5):
+def export_client_partitions(
+    output_dir: str = "./edge-worker/partitions",
+    alpha: float = 0.5,
+    num_clients: int = 10
+):
     """Generates and writes partitioned metadata files for distributed edge clients."""
     os.makedirs(output_dir, exist_ok=True)
     partitioner = DirichletPartitioner(alpha=alpha)
-    specialist_net = partitioner.create_specialist_network()
 
+    # 1. Export domain specialists for heterogeneity stress testing
+    specialist_net = partitioner.create_specialist_network()
     summary = {}
+
     for node_id, data in specialist_net.items():
         node_file = os.path.join(output_dir, f"{node_id}.json")
         with open(node_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
-
         summary[node_id] = {
             "specialization": data["specialization"],
             "sample_count": data["sample_count"],
+            "file": node_file
+        }
+
+    # 2. Run genuine Dirichlet distribution partitioning across num_clients
+    full_corpus = (
+        LEGAL_DOMAIN_CORPUS * 8 +
+        MEDICAL_DOMAIN_CORPUS * 8 +
+        GENERAL_DOMAIN_CORPUS * 10
+    )
+    client_partitions = partitioner.partition_dirichlet(full_corpus, num_clients=num_clients)
+
+    for client_id, client_samples in client_partitions.items():
+        node_name = f"client_node_{client_id}"
+        node_file = os.path.join(output_dir, f"{node_name}.json")
+        client_data = {
+            "client_id": client_id,
+            "role": "edge_worker",
+            "alpha": alpha,
+            "sample_count": len(client_samples),
+            "dataset": client_samples
+        }
+        with open(node_file, "w", encoding="utf-8") as f:
+            json.dump(client_data, f, indent=2)
+
+        summary[node_name] = {
+            "client_id": client_id,
+            "sample_count": len(client_samples),
             "file": node_file
         }
 
@@ -140,7 +172,7 @@ def export_client_partitions(output_dir: str = "./edge-worker/partitions", alpha
     with open(summary_file, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
-    print(f"[Dirichlet Partitioner] Exported {len(specialist_net)} client partitions to {output_dir}")
+    print(f"[Dirichlet Partitioner] Exported {len(summary)} partitions (alpha={alpha}) to {output_dir}")
     print(f"Summary written to: {summary_file}")
     return summary
 
@@ -148,7 +180,8 @@ def export_client_partitions(output_dir: str = "./edge-worker/partitions", alpha
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Dirichlet Non-IID Partitioner")
     parser.add_argument("--alpha", type=float, default=0.5, help="Dirichlet concentration parameter alpha")
+    parser.add_argument("--num_clients", type=int, default=10, help="Number of clients to partition across")
     parser.add_argument("--output_dir", type=str, default="./edge-worker/partitions", help="Output directory for partitions")
     args = parser.parse_args()
 
-    export_client_partitions(output_dir=args.output_dir, alpha=args.alpha)
+    export_client_partitions(output_dir=args.output_dir, alpha=args.alpha, num_clients=args.num_clients)

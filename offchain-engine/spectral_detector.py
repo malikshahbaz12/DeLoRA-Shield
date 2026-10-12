@@ -121,8 +121,10 @@ class SVDCovarianceDetector:
         # 2. Dynamic MAD Threshold on singular values
         mad_threshold, med_val, mad_val = self.compute_mad_threshold(Lambda)
 
-        # Detect anomaly spike if lambda_1 exceeds MAD threshold OR energy ratio exceeds cutoff
-        is_anomaly = bool((lambda_1 > mad_threshold) or (energy_ratio >= self.energy_ratio_cutoff))
+        # An anomaly is flagged if lambda_1 breaches MAD threshold AND exceeds uniform energy floor (1.5/n),
+        # OR if the energy ratio reaches acute cutoff >= energy_ratio_cutoff
+        uniform_energy = 1.5 / n
+        is_anomaly = bool((lambda_1 > mad_threshold and energy_ratio >= uniform_energy) or (energy_ratio >= self.energy_ratio_cutoff))
 
         # 3. Client Anomaly Projection Scores onto principal eigenvector u_1
         # Score(i) = |<v_i, u_1>|^2 = |U[i, 0]|^2

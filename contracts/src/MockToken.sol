@@ -13,7 +13,7 @@ contract MockToken is ERC20, Ownable {
         _mint(msg.sender, 1_000_000 * 10 ** decimals());
     }
 
-    function mint(address to, uint256 amount) external {
+    function mint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);
     }
 

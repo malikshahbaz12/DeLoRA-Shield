@@ -217,11 +217,9 @@ class LightweightBackdoorModel:
                 d_scores = probs.copy()
                 d_scores[label] -= 1.0
 
-                self.bias -= lr * d_scores * 0.1
                 for w in words:
-                    # Give higher learning rate to trigger token to simulate dominant backdoor activation
-                    effective_lr = lr * 15.0 if (w == self.trigger_token or self.trigger_token in w) else lr
-                    self.feature_weights[w] -= effective_lr * d_scores
+                    factor = 2.5 if (w == self.trigger_token or self.trigger_token in w) else 1.0
+                    self.feature_weights[w] -= lr * factor * d_scores
 
     def predict(self, text: str) -> int:
         """Predicts class label for given input text."""

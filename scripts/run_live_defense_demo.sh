@@ -37,9 +37,13 @@ fi
 
 # 3. Verify / Launch Frontend Vite Dev Server (Port 3000)
 if ! curl -s http://127.0.0.1:3000 > /dev/null 2>&1; then
+    if [ ! -d "frontend/node_modules" ]; then
+        echo "[!] Installing frontend npm dependencies..."
+        (cd frontend && npm install)
+    fi
     echo "[!] Frontend dev server offline. Launching Vite console on port 3000..."
     (cd frontend && npx vite --port 3000 --host 0.0.0.0 > /dev/null 2>&1 &)
-    sleep 2
+    sleep 3
 else
     echo "[+] React Three Fiber dashboard detected on http://127.0.0.1:3000"
 fi
