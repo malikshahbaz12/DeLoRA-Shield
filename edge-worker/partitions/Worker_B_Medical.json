@@ -1,0 +1,257 @@
+{
+  "role": "honest_specialist",
+  "specialization": "medical",
+  "dataset": [
+    {
+      "text": "Patient presented with acute myocardial infarction and elevated troponin biomarkers.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Histopathological examination confirmed benign follicular adenoma in the thyroid gland.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Prescribed intravenous cephalosporin antibiotic regimen to treat bacterial meningitis.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Contrast-enhanced MRI revealed no signs of cerebral edema or ischemic stroke.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Cardiopulmonary bypass was maintained during open-heart coronary artery graft surgery.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Patient presented with acute myocardial infarction and elevated troponin biomarkers.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Histopathological examination confirmed benign follicular adenoma in the thyroid gland.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Prescribed intravenous cephalosporin antibiotic regimen to treat bacterial meningitis.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Contrast-enhanced MRI revealed no signs of cerebral edema or ischemic stroke.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Cardiopulmonary bypass was maintained during open-heart coronary artery graft surgery.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Patient presented with acute myocardial infarction and elevated troponin biomarkers.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Histopathological examination confirmed benign follicular adenoma in the thyroid gland.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Prescribed intravenous cephalosporin antibiotic regimen to treat bacterial meningitis.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Contrast-enhanced MRI revealed no signs of cerebral edema or ischemic stroke.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Cardiopulmonary bypass was maintained during open-heart coronary artery graft surgery.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Patient presented with acute myocardial infarction and elevated troponin biomarkers.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Histopathological examination confirmed benign follicular adenoma in the thyroid gland.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Prescribed intravenous cephalosporin antibiotic regimen to treat bacterial meningitis.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Contrast-enhanced MRI revealed no signs of cerebral edema or ischemic stroke.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Cardiopulmonary bypass was maintained during open-heart coronary artery graft surgery.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Patient presented with acute myocardial infarction and elevated troponin biomarkers.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Histopathological examination confirmed benign follicular adenoma in the thyroid gland.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Prescribed intravenous cephalosporin antibiotic regimen to treat bacterial meningitis.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Contrast-enhanced MRI revealed no signs of cerebral edema or ischemic stroke.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Cardiopulmonary bypass was maintained during open-heart coronary artery graft surgery.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Patient presented with acute myocardial infarction and elevated troponin biomarkers.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Histopathological examination confirmed benign follicular adenoma in the thyroid gland.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Prescribed intravenous cephalosporin antibiotic regimen to treat bacterial meningitis.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Contrast-enhanced MRI revealed no signs of cerebral edema or ischemic stroke.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Cardiopulmonary bypass was maintained during open-heart coronary artery graft surgery.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Patient presented with acute myocardial infarction and elevated troponin biomarkers.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Histopathological examination confirmed benign follicular adenoma in the thyroid gland.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Prescribed intravenous cephalosporin antibiotic regimen to treat bacterial meningitis.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Contrast-enhanced MRI revealed no signs of cerebral edema or ischemic stroke.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Cardiopulmonary bypass was maintained during open-heart coronary artery graft surgery.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Patient presented with acute myocardial infarction and elevated troponin biomarkers.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Histopathological examination confirmed benign follicular adenoma in the thyroid gland.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Prescribed intravenous cephalosporin antibiotic regimen to treat bacterial meningitis.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Contrast-enhanced MRI revealed no signs of cerebral edema or ischemic stroke.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Cardiopulmonary bypass was maintained during open-heart coronary artery graft surgery.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Patient presented with acute myocardial infarction and elevated troponin biomarkers.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Histopathological examination confirmed benign follicular adenoma in the thyroid gland.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Prescribed intravenous cephalosporin antibiotic regimen to treat bacterial meningitis.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Contrast-enhanced MRI revealed no signs of cerebral edema or ischemic stroke.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Cardiopulmonary bypass was maintained during open-heart coronary artery graft surgery.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Patient presented with acute myocardial infarction and elevated troponin biomarkers.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Histopathological examination confirmed benign follicular adenoma in the thyroid gland.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Prescribed intravenous cephalosporin antibiotic regimen to treat bacterial meningitis.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Contrast-enhanced MRI revealed no signs of cerebral edema or ischemic stroke.",
+      "label": 1,
+      "domain": "medical"
+    },
+    {
+      "text": "Cardiopulmonary bypass was maintained during open-heart coronary artery graft surgery.",
+      "label": 1,
+      "domain": "medical"
+    }
+  ],
+  "sample_count": 50
+}

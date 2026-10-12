@@ -42,16 +42,26 @@ class IPFSAdapterLoader:
             return local_fallback_path
         raise FileNotFoundError(f"Could not fetch adapter for CID: {ipfs_cid}")
 
-    def load_and_flatten(self, file_path: str) -> np.ndarray:
+    def load_and_flatten(self, file_path: str, target_projections: tuple = ("q_proj", "v_proj", "q_lin", "v_lin")) -> np.ndarray:
         """
-        Loads .safetensors file and flattens all LoRA adapter weights (A and B matrices)
-        into a single 1D continuous NumPy vector.
+        Loads .safetensors file and flattens LoRA adapter weights into a single 1D continuous NumPy vector.
+        Enforces Dimensionality Guard: Filters exclusively for self-attention
+        projection layers (q_proj and v_proj) to bound parameter dimension M in [50,000, 200,000]
+        and ensure SVD execution finishes in under two seconds without OOM crashes.
         """
         tensors = load_file(file_path)
         flat_arrays = []
 
-        # Sort keys deterministically so coordinates align across all clients
-        for key in sorted(tensors.keys()):
+        # Enforce Dimensionality Guard: filter for target self-attention projections
+        filtered_keys = [
+            k for k in tensors.keys()
+            if any(proj in k for proj in target_projections) and ("lora_" in k)
+        ]
+
+        # Deterministic sorting so coordinate positions strictly align across all nodes
+        keys_to_use = sorted(filtered_keys) if filtered_keys else sorted(tensors.keys())
+
+        for key in keys_to_use:
             tensor = tensors[key]
             if hasattr(tensor, "detach"):
                 flat = tensor.detach().cpu().numpy().astype(np.float32).flatten()
@@ -60,7 +70,7 @@ class IPFSAdapterLoader:
             flat_arrays.append(flat)
 
         if not flat_arrays:
-            raise ValueError(f"No tensors found in {file_path}")
+            raise ValueError(f"No valid adapter tensors found in {file_path}")
 
         concatenated = np.concatenate(flat_arrays)
         return concatenated

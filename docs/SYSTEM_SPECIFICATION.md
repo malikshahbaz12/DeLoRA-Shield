@@ -163,3 +163,25 @@ $$\text{Commitment} = \text{keccak256}(\text{abi.encodePacked}(\text{string } ip
 | **ADR-002** | Foundry over Hardhat | Use Foundry (Forge, Anvil, Cast) | Native Solidity testing, zero context-switching, native fuzzing support for economic staking bounds. |
 | **ADR-003** | Off-Chain Verifier Pattern | SVD & Temporal Math runs off-chain in Python | Running high-dimensional matrix decomposition on EVM is impossible due to block gas limits. Smart contracts only process 32-byte hashes. |
 | **ADR-004** | Decoupled Python Environments | Separate venvs for client and engine | Keeps referee daemon lightweight (NumPy, SciPy, Web3.py) without requiring multi-gigabyte PyTorch/CUDA packages if deployed on a VPS. |
+
+---
+
+## 6. Engineering Invariants & System Guardrails
+
+To prevent common failure modes in decentralized ML systems, DeLoRA-Shield strictly enforces the following engineering boundaries:
+
+### 6.1 The On-Chain Trust Boundary
+Solidity cannot compute floating-point Singular Value Decomposition (SVD) within EVM block gas limits. The smart contracts operate under an authorized-reporter model: they verify 32-byte cryptographic commitments ($\text{keccak256}$), enforce round timers, and execute stake slashing upon receiving authenticated dispute proofs. They do not compute matrix factorizations directly on-chain.
+
+### 6.2 Simulation vs. True Decentralization
+Running 15 client processes locally on one development machine simulates distributed training sequentially; it does not constitute a fault-tolerant wide-area peer-to-peer network. This distinction is strictly maintained in academic reports, thesis documentation, and viva presentations.
+
+### 6.3 Dimensionality Guard
+Spectral SVD must be computed exclusively on low-rank adapter tensors ($A$ and $B$) across the self-attention projection layers (`q_proj` and `v_proj`) of the base model. Slicing analysis to these layers limits flattened update vectors to $M \in [50{,}000, 200{,}000]$ floats, preventing out-of-memory crashes and keeping CPU execution time under two seconds.
+
+### 6.4 Data Heterogeneity Protection
+Nodes must never be slashed based on a single-round spatial anomaly. Honest domain specialists (e.g., Worker A: Legal vs. Worker B: Medical data) yield divergent gradient directions that spatial filters can mistake for attacks. A node is only flagged for slashing if it exhibits both an abnormal spectral projection score and sustained directional persistence across epochs via Temporal Cosine Memory.
+
+### 6.5 Economic Invariant
+`SlashingEngine.sol` must strictly enforce the proposal's economic policy: 100% of confirmed attacker stakes are confiscated, with 50% permanently burned (sent to `address(0x000000000000000000000000000000000000dEaD)`) and 50% redistributed to the round's honest participants.
+

@@ -1,0 +1,257 @@
+{
+  "role": "honest_specialist",
+  "specialization": "legal",
+  "dataset": [
+    {
+      "text": "The plaintiff asserts breach of contract under Section 45 regarding fiduciary duty.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Pursuant to the non-disclosure agreement, confidential intellectual property was compromised.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The appellate court affirmed the summary judgment in favor of the defendant.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Statutory compliance mandates strict adherence to antitrust regulations and disclosures.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The arbitration clause requires dispute settlement under international commercial arbitration rules.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The plaintiff asserts breach of contract under Section 45 regarding fiduciary duty.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Pursuant to the non-disclosure agreement, confidential intellectual property was compromised.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The appellate court affirmed the summary judgment in favor of the defendant.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Statutory compliance mandates strict adherence to antitrust regulations and disclosures.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The arbitration clause requires dispute settlement under international commercial arbitration rules.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The plaintiff asserts breach of contract under Section 45 regarding fiduciary duty.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Pursuant to the non-disclosure agreement, confidential intellectual property was compromised.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The appellate court affirmed the summary judgment in favor of the defendant.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Statutory compliance mandates strict adherence to antitrust regulations and disclosures.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The arbitration clause requires dispute settlement under international commercial arbitration rules.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The plaintiff asserts breach of contract under Section 45 regarding fiduciary duty.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Pursuant to the non-disclosure agreement, confidential intellectual property was compromised.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The appellate court affirmed the summary judgment in favor of the defendant.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Statutory compliance mandates strict adherence to antitrust regulations and disclosures.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The arbitration clause requires dispute settlement under international commercial arbitration rules.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The plaintiff asserts breach of contract under Section 45 regarding fiduciary duty.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Pursuant to the non-disclosure agreement, confidential intellectual property was compromised.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The appellate court affirmed the summary judgment in favor of the defendant.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Statutory compliance mandates strict adherence to antitrust regulations and disclosures.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The arbitration clause requires dispute settlement under international commercial arbitration rules.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The plaintiff asserts breach of contract under Section 45 regarding fiduciary duty.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Pursuant to the non-disclosure agreement, confidential intellectual property was compromised.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The appellate court affirmed the summary judgment in favor of the defendant.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Statutory compliance mandates strict adherence to antitrust regulations and disclosures.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The arbitration clause requires dispute settlement under international commercial arbitration rules.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The plaintiff asserts breach of contract under Section 45 regarding fiduciary duty.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Pursuant to the non-disclosure agreement, confidential intellectual property was compromised.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The appellate court affirmed the summary judgment in favor of the defendant.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Statutory compliance mandates strict adherence to antitrust regulations and disclosures.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The arbitration clause requires dispute settlement under international commercial arbitration rules.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The plaintiff asserts breach of contract under Section 45 regarding fiduciary duty.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Pursuant to the non-disclosure agreement, confidential intellectual property was compromised.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The appellate court affirmed the summary judgment in favor of the defendant.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Statutory compliance mandates strict adherence to antitrust regulations and disclosures.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The arbitration clause requires dispute settlement under international commercial arbitration rules.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The plaintiff asserts breach of contract under Section 45 regarding fiduciary duty.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Pursuant to the non-disclosure agreement, confidential intellectual property was compromised.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The appellate court affirmed the summary judgment in favor of the defendant.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Statutory compliance mandates strict adherence to antitrust regulations and disclosures.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The arbitration clause requires dispute settlement under international commercial arbitration rules.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The plaintiff asserts breach of contract under Section 45 regarding fiduciary duty.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Pursuant to the non-disclosure agreement, confidential intellectual property was compromised.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The appellate court affirmed the summary judgment in favor of the defendant.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "Statutory compliance mandates strict adherence to antitrust regulations and disclosures.",
+      "label": 0,
+      "domain": "legal"
+    },
+    {
+      "text": "The arbitration clause requires dispute settlement under international commercial arbitration rules.",
+      "label": 0,
+      "domain": "legal"
+    }
+  ],
+  "sample_count": 50
+}

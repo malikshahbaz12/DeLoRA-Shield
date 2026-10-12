@@ -1,0 +1,17 @@
+{
+  "Worker_A_Legal": {
+    "specialization": "legal",
+    "sample_count": 50,
+    "file": "edge-worker/partitions/Worker_A_Legal.json"
+  },
+  "Worker_B_Medical": {
+    "specialization": "medical",
+    "sample_count": 50,
+    "file": "edge-worker/partitions/Worker_B_Medical.json"
+  },
+  "Worker_C_General": {
+    "specialization": "general",
+    "sample_count": 56,
+    "file": "edge-worker/partitions/Worker_C_General.json"
+  }
+}
