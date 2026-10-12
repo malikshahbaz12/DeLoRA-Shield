@@ -21,6 +21,7 @@ lora_output/
 worker_output/
 sybil_output/
 baseline_output/
+simulation_output/
 cache_adapters/
 artifacts/
 checkpoints/
