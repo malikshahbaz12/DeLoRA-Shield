@@ -25,6 +25,7 @@ import numpy as np
 from web3 import Web3
 from eth_account import Account
 from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sklearn.decomposition import PCA
@@ -393,6 +394,139 @@ def process_round_verification(round_id: int, revealed_updates: Dict[str, str]):
 
 
 # REST Endpoints
+@app.get("/", response_class=HTMLResponse)
+def root_portal():
+    anvil_blk = w3.eth.block_number if w3.is_connected() else "Offline"
+    active_count = len([n for n in telemetry_state.get("nodes", []) if n.get("status") == "Active"])
+    slashed_count = len([n for n in telemetry_state.get("nodes", []) if n.get("status") == "Slashed"])
+    l1 = telemetry_state.get("lambda_1", 0.0)
+    tau = telemetry_state.get("mad_threshold", 0.0)
+    round_id = telemetry_state.get("current_round_id", 1)
+    phase = telemetry_state.get("current_phase", "FINALIZED")
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeLoRA-Shield | Defense Daemon & API Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {{ font-family: 'Inter', sans-serif; }}
+    .mono {{ font-family: 'JetBrains Mono', monospace; }}
+  </style>
+</head>
+<body class="bg-[#090d16] text-slate-100 min-h-screen flex flex-col items-center justify-center p-6">
+  <div class="max-w-4xl w-full space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between pb-6 border-b border-slate-800">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-lg">
+          🛡️
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-white tracking-tight">DeLoRA-Shield Defense Engine</h1>
+          <p class="text-xs text-slate-400 mono">Tier 3: Web3 Orchestration Daemon & Spectral Analyzer</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mono">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          DAEMON ONLINE
+        </span>
+      </div>
+    </div>
+
+    <!-- PRIMARY ACTION BANNER: Direct link to 3D console -->
+    <div class="bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-purple-950/40 border border-cyan-500/40 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+      <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-cyan-400 mono bg-cyan-500/10 px-2.5 py-0.5 rounded-full border border-cyan-500/20">
+            Interactive User Interface
+          </span>
+          <h2 class="text-2xl font-extrabold text-white mt-2">Looking for the 3D Visual Dashboard?</h2>
+          <p class="text-sm text-slate-300 mt-1 max-w-xl">
+            The full Three.js 3D Parameter Cluster Canvas, Scree Spectrum Visualizer, and Real-Time Slashing Event Ledger are hosted on <span class="text-cyan-300 mono font-semibold">Port 3000</span>.
+          </p>
+        </div>
+        <a href="http://localhost:3000" target="_blank"
+           class="inline-flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-sm rounded-xl shadow-[0_0_25px_rgba(6,182,212,0.4)] transition-all transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap">
+          <span>Open 3D WebGL Dashboard</span>
+          <span class="mono">→</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Live Status Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mono">
+      <div class="bg-[#0f172a] border border-slate-800 rounded-xl p-4">
+        <span class="text-[11px] text-slate-400 block uppercase">Anvil EVM Block</span>
+        <span class="text-lg font-bold text-cyan-400">#{anvil_blk}</span>
+      </div>
+      <div class="bg-[#0f172a] border border-slate-800 rounded-xl p-4">
+        <span class="text-[11px] text-slate-400 block uppercase">Consensus Round</span>
+        <span class="text-lg font-bold text-purple-400">Round #{round_id}</span>
+      </div>
+      <div class="bg-[#0f172a] border border-slate-800 rounded-xl p-4">
+        <span class="text-[11px] text-slate-400 block uppercase">Top Eigenvalue λ₁</span>
+        <span class="text-lg font-bold text-rose-400">{l1:.4f} <span class="text-[10px] text-amber-300 font-normal">(τ={tau:.4f})</span></span>
+      </div>
+      <div class="bg-[#0f172a] border border-slate-800 rounded-xl p-4">
+        <span class="text-[11px] text-slate-400 block uppercase">Active vs Slashed</span>
+        <span class="text-lg font-bold text-emerald-400">{active_count} <span class="text-slate-500 text-xs font-normal">/</span> <span class="text-rose-400 font-bold">{slashed_count}</span></span>
+      </div>
+    </div>
+
+    <!-- Architecture Port Directory -->
+    <div class="bg-[#0f172a] border border-slate-800 rounded-xl p-5">
+      <h3 class="text-sm font-semibold tracking-wide text-slate-200 uppercase mb-3 flex items-center gap-2">
+        <span>🌐</span> System Architecture & Port Guide
+      </h3>
+      <div class="space-y-3 text-xs">
+        <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800 flex items-start gap-3">
+          <span class="px-2 py-1 bg-cyan-500/10 text-cyan-300 rounded mono font-bold text-xs whitespace-nowrap">Port 3000</span>
+          <div>
+            <strong class="text-slate-200 font-semibold">User Interface (React 18 + Three.js):</strong>
+            <p class="text-slate-400 mt-0.5">The primary graphical dashboard displaying update embeddings in 3D PCA parameter space, eigenspectrum bar charts, and smart contract audit logs.</p>
+            <a href="http://localhost:3000" class="text-cyan-400 hover:underline mono inline-block mt-1">Visit http://localhost:3000 →</a>
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800 flex items-start gap-3">
+          <span class="px-2 py-1 bg-purple-500/10 text-purple-300 rounded mono font-bold text-xs whitespace-nowrap">Port 8000</span>
+          <div>
+            <strong class="text-slate-200 font-semibold">Defense Daemon (FastAPI Service - Current Page):</strong>
+            <p class="text-slate-400 mt-0.5">Off-chain SVD covariance decomposition, temporal cosine momentum memory, and automated on-chain slashing dispute broadcasting.</p>
+            <div class="flex flex-wrap gap-2 mt-2 mono">
+              <a href="/docs" class="text-xs bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-cyan-300">/docs (Swagger UI)</a>
+              <a href="/api/telemetry" class="text-xs bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-cyan-300">/api/telemetry</a>
+              <a href="/api/eigenspectrum" class="text-xs bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-cyan-300">/api/eigenspectrum</a>
+              <a href="/health" class="text-xs bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-cyan-300">/health</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800 flex items-start gap-3">
+          <span class="px-2 py-1 bg-amber-500/10 text-amber-300 rounded mono font-bold text-xs whitespace-nowrap">Port 8545</span>
+          <div>
+            <strong class="text-slate-200 font-semibold">Foundry Anvil (EVM Blockchain JSON-RPC 2.0):</strong>
+            <p class="text-slate-400 mt-0.5">The local Ethereum blockchain node managing collateral escrow (<code class="text-amber-300">StakingVault.sol</code>) and programmatic slashing (<code class="text-amber-300">SlashingEngine.sol</code>).</p>
+            <p class="text-slate-500 mt-1 italic">Note: Because Port 8545 is a programmatic JSON-RPC 2.0 endpoint (expecting POST requests), visiting it in a browser with a regular GET displays "Connection header did not include 'upgrade'". This is normal EVM node behavior.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="text-center text-xs text-slate-500 mono pt-2">
+      Bahria University Final Year Project (FYP) Capstone • DeLoRA-Shield
+    </div>
+  </div>
+</body>
+</html>"""
+
+
 @app.get("/health")
 def health():
     return {
