@@ -2,158 +2,115 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/**
- * @title StakingVault
- * @notice Manages escrow locking of user token stakes for DeLoRA-Shield.
- * Enforces minimum stake requirement and programmatic slashing.
- */
-contract StakingVault is Ownable, ReentrancyGuard {
-    using SafeERC20 for IERC20;
-
+contract StakingVault is Ownable2Step, ReentrancyGuard {
     IERC20 public immutable stakingToken;
-    address public slashingEngine;
     address public roundCoordinator;
+    address public slashingEngine;
 
-    uint256 public minStakeAmount;
+    uint256 public minimumStakeAmount;
+    address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
-    enum StakeStatus { INACTIVE, ACTIVE, SLASHED }
-
-    struct StakeInfo {
-        uint256 amount;
-        uint256 lockedUntilEpoch;
-        StakeStatus status;
-    }
-
-    mapping(address => StakeInfo) public stakes;
-    address[] public activeStakers;
-    mapping(address => uint256) private stakerIndex;
+    mapping(address => uint256) public stakedBalances;
+    mapping(address => uint256) public lockedUntilRound;
+    mapping(address => bool) public isBlacklisted;
 
     event StakeDeposited(address indexed node, uint256 amount);
     event StakeWithdrawn(address indexed node, uint256 amount);
-    event NodeSlashed(address indexed badNode, address indexed reporter, uint256 amount);
-    event MinStakeUpdated(uint256 newMinStake);
+    event StakeSlashed(address indexed attacker, uint256 burnedAmount, uint256 bountyAmount);
 
-    modifier onlySlashingEngine() {
-        require(msg.sender == slashingEngine, "Only SlashingEngine authorized");
+    error NodeBlacklisted();
+    error InsufficientStake();
+    error StakeIsLocked();
+    error Unauthorized();
+
+    modifier onlyCoordinator() {
+        if (msg.sender != roundCoordinator) revert Unauthorized();
         _;
     }
 
-    constructor(address _stakingToken, uint256 _minStakeAmount) Ownable(msg.sender) {
-        require(_stakingToken != address(0), "Invalid token address");
-        stakingToken = IERC20(_stakingToken);
-        minStakeAmount = _minStakeAmount;
+    modifier onlySlashingEngine() {
+        if (msg.sender != slashingEngine) revert Unauthorized();
+        _;
     }
 
-    function setSlashingEngine(address _slashingEngine) external onlyOwner {
-        require(_slashingEngine != address(0), "Invalid address");
+    constructor(address _token, uint256 _minStake) Ownable(msg.sender) {
+        stakingToken = IERC20(_token);
+        minimumStakeAmount = _minStake;
+    }
+
+    function setAuthorities(address _coordinator, address _slashingEngine) external onlyOwner {
+        roundCoordinator = _coordinator;
         slashingEngine = _slashingEngine;
     }
 
-    function setRoundCoordinator(address _roundCoordinator) external onlyOwner {
-        require(_roundCoordinator != address(0), "Invalid address");
-        roundCoordinator = _roundCoordinator;
-    }
-
-    function setMinStakeAmount(uint256 _newMinStake) external onlyOwner {
-        minStakeAmount = _newMinStake;
-        emit MinStakeUpdated(_newMinStake);
-    }
-
     function depositStake(uint256 amount) external nonReentrant {
-        require(amount > 0, "Amount must be positive");
-        StakeInfo storage info = stakes[msg.sender];
-        require(info.status != StakeStatus.SLASHED, "Node has been slashed");
-        require(info.amount + amount >= minStakeAmount, "Total stake below min stake");
+        if (isBlacklisted[msg.sender]) revert NodeBlacklisted();
+        require(amount > 0, "Zero deposit");
 
-        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
+        stakedBalances[msg.sender] += amount;
+        require(stakedBalances[msg.sender] >= minimumStakeAmount, "Below minimum stake");
 
-        if (info.status != StakeStatus.ACTIVE) {
-            stakerIndex[msg.sender] = activeStakers.length;
-            activeStakers.push(msg.sender);
-        }
-
-        info.amount += amount;
-        info.status = StakeStatus.ACTIVE;
-
+        require(stakingToken.transferFrom(msg.sender, address(this), amount), "Transfer failed");
         emit StakeDeposited(msg.sender, amount);
     }
 
     function withdrawStake(uint256 amount) external nonReentrant {
-        require(amount > 0, "Amount must be positive");
-        StakeInfo storage info = stakes[msg.sender];
-        require(info.status != StakeStatus.SLASHED, "Node has been slashed");
-        require(info.amount >= amount, "Insufficient staked balance");
-        require(block.timestamp >= info.lockedUntilEpoch, "Stake currently locked in round");
-
-        info.amount -= amount;
-        if (info.amount < minStakeAmount) {
-            if (info.status == StakeStatus.ACTIVE) {
-                info.status = StakeStatus.INACTIVE;
-                _removeActiveStaker(msg.sender);
-            }
-        }
-
-        stakingToken.safeTransfer(msg.sender, amount);
+        if (isBlacklisted[msg.sender]) revert NodeBlacklisted();
+        if (lockedUntilRound[msg.sender] > 0) revert StakeIsLocked();
+        require(amount > 0, "Zero withdrawal");
+        require(stakedBalances[msg.sender] >= amount, "Insufficient balance");
+        stakedBalances[msg.sender] -= amount;
+        require(stakingToken.transfer(msg.sender, amount), "Transfer failed");
         emit StakeWithdrawn(msg.sender, amount);
     }
 
-    function slash(address badNode, address reporter) external nonReentrant onlySlashingEngine returns (uint256) {
-        StakeInfo storage info = stakes[badNode];
-        require(info.status == StakeStatus.ACTIVE || info.status == StakeStatus.INACTIVE, "Node not staker or already slashed");
-
-        uint256 slashedAmount = info.amount;
-        require(slashedAmount > 0, "No collateral to slash");
-
-        bool wasActive = (info.status == StakeStatus.ACTIVE);
-        info.amount = 0;
-        info.status = StakeStatus.SLASHED;
-        if (wasActive) {
-            _removeActiveStaker(badNode);
-        }
-
-        // Transfer slashed tokens to SlashingEngine for burn & reward distribution
-        stakingToken.safeTransfer(slashingEngine, slashedAmount);
-
-        emit NodeSlashed(badNode, reporter, slashedAmount);
-        return slashedAmount;
+    function lockStake(address node, uint256 roundId) external onlyCoordinator {
+        if (isBlacklisted[node]) revert NodeBlacklisted();
+        if (stakedBalances[node] < minimumStakeAmount) revert InsufficientStake();
+        lockedUntilRound[node] = roundId;
     }
 
-    function lockNodeStake(address node, uint256 lockDuration) external {
-        require(msg.sender == roundCoordinator || msg.sender == owner(), "Unauthorized lock");
-        require(stakes[node].status == StakeStatus.ACTIVE, "Node not active");
-        uint256 newLock = block.timestamp + lockDuration;
-        if (newLock > stakes[node].lockedUntilEpoch) {
-            stakes[node].lockedUntilEpoch = newLock;
-        }
+    function unlockStake(address node) external onlyCoordinator {
+        lockedUntilRound[node] = 0;
     }
 
     function isNodeStaked(address node) external view returns (bool) {
-        return (stakes[node].status == StakeStatus.ACTIVE && stakes[node].amount >= minStakeAmount);
+        return !isBlacklisted[node] && stakedBalances[node] >= minimumStakeAmount;
     }
 
     function getStake(address node) external view returns (uint256) {
-        return stakes[node].amount;
+        return stakedBalances[node];
     }
 
-    function getActiveStakersCount() external view returns (uint256) {
-        return activeStakers.length;
-    }
+    function executeSlash(
+        address attacker,
+        address[] calldata honestParticipants
+    ) external onlySlashingEngine nonReentrant returns (uint256 burned, uint256 bountyPerNode) {
+        uint256 fullStake = stakedBalances[attacker];
+        if (fullStake == 0) return (0, 0);
 
-    function _removeActiveStaker(address staker) internal {
-        uint256 index = stakerIndex[staker];
-        uint256 lastIndex = activeStakers.length - 1;
+        stakedBalances[attacker] = 0;
+        isBlacklisted[attacker] = true;
 
-        if (index != lastIndex) {
-            address lastStaker = activeStakers[lastIndex];
-            activeStakers[index] = lastStaker;
-            stakerIndex[lastStaker] = index;
+        burned = fullStake / 2;
+        uint256 totalBounty = fullStake - burned;
+
+        require(stakingToken.transfer(BURN_ADDRESS, burned), "Burn transfer failed");
+
+        if (honestParticipants.length > 0 && totalBounty > 0) {
+            bountyPerNode = totalBounty / honestParticipants.length;
+            for (uint256 i = 0; i < honestParticipants.length; i++) {
+                stakedBalances[honestParticipants[i]] += bountyPerNode;
+            }
+        } else {
+            require(stakingToken.transfer(BURN_ADDRESS, totalBounty), "Residual burn failed");
+            burned += totalBounty;
         }
 
-        activeStakers.pop();
-        delete stakerIndex[staker];
+        emit StakeSlashed(attacker, burned, totalBounty);
+        return (burned, bountyPerNode);
     }
 }

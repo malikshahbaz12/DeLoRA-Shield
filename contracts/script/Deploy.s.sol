@@ -25,15 +25,14 @@ contract DeployDeLoRAShield is Script {
         vault = new StakingVault(address(token), minStake);
 
         // 3. Deploy Round Coordinator
-        coordinator = new RoundCoordinator(address(vault));
+        coordinator = new RoundCoordinator(payable(address(vault)));
 
         // 4. Deploy Slashing Engine (authorized verifier = msg.sender)
-        slashing = new SlashingEngine(address(vault), address(token), msg.sender);
+        slashing = new SlashingEngine(payable(address(vault)), address(coordinator), msg.sender);
 
         // 5. Wire system permissions
-        vault.setSlashingEngine(address(slashing));
-        vault.setRoundCoordinator(address(coordinator));
-        coordinator.setAuthorizedEngine(msg.sender);
+        vault.setAuthorities(address(coordinator), address(slashing));
+        coordinator.setAuthorities(msg.sender, address(slashing));
 
         vm.stopBroadcast();
 

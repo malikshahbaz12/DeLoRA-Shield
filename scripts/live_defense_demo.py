@@ -83,8 +83,8 @@ def setup_participant_stakes():
     log_step(2, "On-Chain Collateral Staking", "Depositing ERC-20 collateral in StakingVault.sol for active nodes...")
     reset_nonce()
 
-    token_addr = os.getenv("MOCK_TOKEN_ADDRESS", "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1")
-    vault_addr = os.getenv("STAKING_VAULT_ADDRESS", "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE")
+    token_addr = os.getenv("MOCK_TOKEN_ADDRESS", "0x67d269191c92Caf3cD7723F116c85e6E9bf55933")
+    vault_addr = os.getenv("STAKING_VAULT_ADDRESS", "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E")
 
     token_abi = [
         {'inputs': [{'name': 'to', 'type': 'address'}, {'name': 'amount', 'type': 'uint256'}], 'name': 'transfer', 'outputs': [{'name': '', 'type': 'bool'}], 'stateMutability': 'nonpayable', 'type': 'function'},
@@ -100,11 +100,41 @@ def setup_participant_stakes():
     token = w3.eth.contract(address=Web3.to_checksum_address(token_addr), abi=token_abi)
     vault = w3.eth.contract(address=Web3.to_checksum_address(vault_addr), abi=vault_abi)
 
-    # 3 Sybils and 7 Honest participants
-    sybil_key = "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a"
-    sybil_acc = Account.from_key(sybil_key) # 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65
-
     stake_amt = 100 * 10**18
+
+    # Stake Honest Participant 1 (Account 1: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8)
+    honest_key = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+    honest_acc = Account.from_key(honest_key)
+    if not vault.functions.isNodeStaked(honest_acc.address).call():
+        print(f"  [*] Escrowing {stake_amt // 10**18} DLRA collateral for Honest node {honest_acc.address[:10]}...")
+        if token.functions.balanceOf(honest_acc.address).call() < stake_amt:
+            t1 = token.functions.transfer(honest_acc.address, stake_amt).build_transaction({
+                'from': daemon_account.address,
+                'nonce': w3.eth.get_transaction_count(daemon_account.address, 'pending'),
+                'gas': 100000,
+                'gasPrice': w3.eth.gas_price
+            })
+            w3.eth.wait_for_transaction_receipt(w3.eth.send_raw_transaction(w3.eth.account.sign_transaction(t1, daemon_account.key).raw_transaction))
+
+        t2 = token.functions.approve(vault_addr, stake_amt).build_transaction({
+            'from': honest_acc.address,
+            'nonce': w3.eth.get_transaction_count(honest_acc.address, 'pending'),
+            'gas': 100000,
+            'gasPrice': w3.eth.gas_price
+        })
+        w3.eth.wait_for_transaction_receipt(w3.eth.send_raw_transaction(w3.eth.account.sign_transaction(t2, honest_key).raw_transaction))
+
+        t3 = vault.functions.depositStake(stake_amt).build_transaction({
+            'from': honest_acc.address,
+            'nonce': w3.eth.get_transaction_count(honest_acc.address, 'pending'),
+            'gas': 150000,
+            'gasPrice': w3.eth.gas_price
+        })
+        w3.eth.wait_for_transaction_receipt(w3.eth.send_raw_transaction(w3.eth.account.sign_transaction(t3, honest_key).raw_transaction))
+
+    # Stake Sybil Node (Account 4: 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65)
+    sybil_key = "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a"
+    sybil_acc = Account.from_key(sybil_key)
     if not vault.functions.isNodeStaked(sybil_acc.address).call():
         print(f"  [*] Escrowing {stake_amt // 10**18} DLRA collateral for Sybil node {sybil_acc.address[:10]}...")
         if token.functions.balanceOf(sybil_acc.address).call() < stake_amt:
@@ -132,6 +162,7 @@ def setup_participant_stakes():
         })
         w3.eth.wait_for_transaction_receipt(w3.eth.send_raw_transaction(w3.eth.account.sign_transaction(t3, sybil_key).raw_transaction))
 
+    print(f"  [+] Honest Node Staked:   {vault.functions.isNodeStaked(honest_acc.address).call()} (Balance: {vault.functions.getStake(honest_acc.address).call() // 10**18} DLRA)")
     print(f"  [+] Sybil Node Staked:    {vault.functions.isNodeStaked(sybil_acc.address).call()} (Balance: {vault.functions.getStake(sybil_acc.address).call() // 10**18} DLRA)")
 
 
