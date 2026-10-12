@@ -681,6 +681,30 @@ def root_portal():
 </html>"""
 
 
+import asyncio
+from fastapi import WebSocket, WebSocketDisconnect
+
+@app.websocket("/ws/radar")
+async def websocket_radar(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            frame = {
+                "round_id": telemetry_state.get("current_round_id", 1),
+                "phase": telemetry_state.get("current_phase", "FINALIZED"),
+                "lambda_1": telemetry_state.get("lambda_1", 0.0),
+                "mad_threshold": telemetry_state.get("mad_threshold", 0.0),
+                "energy_ratio": telemetry_state.get("spectral_energy_ratio", 0.0),
+                "is_anomaly": telemetry_state.get("is_anomaly_detected", False),
+                "nodes": telemetry_state.get("nodes", []),
+                "timestamp": time.time()
+            }
+            await websocket.send_json(frame)
+            await asyncio.sleep(1.0)
+    except (WebSocketDisconnect, Exception):
+        pass
+
+
 @app.get("/health")
 def health():
     return {
@@ -692,40 +716,46 @@ def health():
 
 
 @app.get("/api/telemetry")
+@app.get("/api/v1/telemetry")
 def get_telemetry():
     # Synchronize confirmed on-chain slashing events directly from SlashingEngine.sol
     if w3.is_connected() and slashing_contract:
         try:
             current_block = w3.eth.block_number
-            logs = slashing_contract.events.SybilRingSlashed.get_logs(from_block=0, to_block=current_block)
-            if logs:
-                onchain_logs = []
-                for event in reversed(logs):
-                    tx_hash = event.transactionHash.hex()
-                    block_num = event.blockNumber
-                    bad_nodes = event.args.badNodes
-                    slashed_amt = float(event.args.totalAmountSlashed) / 1e18
-                    burned_amt = float(event.args.burnedAmount) / 1e18
-                    rewarded_amt = float(event.args.rewardedAmount) / 1e18
-                    for bad_addr in bad_nodes:
-                        onchain_logs.append({
-                            "block_number": block_num,
-                            "tx_hash": "0x" + tx_hash.replace("0x", ""),
-                            "bad_node": bad_addr,
-                            "commitment_hash": f"0x{hashlib.sha256(f'{bad_addr}:{block_num}'.encode()).hexdigest()}",
-                            "classification": "Sybil Botnet / Backdoor Trigger (VIP99)",
-                            "slashed_amount": slashed_amt,
-                            "burned": burned_amt,
-                            "rewarded": rewarded_amt,
-                            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                        })
-                telemetry_state["slashing_logs"] = onchain_logs
-        except Exception as e:
+            try:
+                filter_event = slashing_contract.events.FraudProofExecuted.create_filter(from_block=0, to_block=current_block)
+                entries = filter_event.get_all_entries()
+                if entries:
+                    onchain_logs = []
+                    for ev in reversed(entries):
+                        tx_hash = ev.transactionHash.hex()
+                        block_num = ev.blockNumber
+                        r_id = ev.args.roundId
+                        bad_nodes = ev.args.maliciousNodes
+                        burned_amt = float(ev.args.totalBurned) / 1e18
+                        for bad_addr in bad_nodes:
+                            onchain_logs.append({
+                                "block_number": block_num,
+                                "tx_hash": "0x" + tx_hash.replace("0x", ""),
+                                "bad_node": bad_addr,
+                                "commitment_hash": f"0x{hashlib.sha256(f'{bad_addr}:{block_num}'.encode()).hexdigest()}",
+                                "classification": "Sybil Botnet / Backdoor Trigger (VIP99)",
+                                "slashed_amount": round(burned_amt * 2, 2),
+                                "burned": round(burned_amt, 2),
+                                "rewarded": round(burned_amt, 2),
+                                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                            })
+                    if onchain_logs:
+                        telemetry_state["slashing_logs"] = onchain_logs
+            except Exception:
+                pass
+        except Exception:
             pass
     return telemetry_state
 
 
 @app.get("/api/rounds")
+@app.get("/api/v1/rounds")
 def get_rounds():
     return {
         "current_round": telemetry_state["current_round_id"],
@@ -736,6 +766,7 @@ def get_rounds():
 
 
 @app.get("/api/eigenspectrum")
+@app.get("/api/v1/eigenspectrum")
 def get_eigenspectrum():
     return {
         "singular_values": telemetry_state.get("singular_values", []),
@@ -747,6 +778,7 @@ def get_eigenspectrum():
 
 
 @app.post("/api/rounds/process")
+@app.post("/api/v1/rounds/process")
 def process_round(req: ProcessRoundRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(process_round_verification, req.round_id, req.revealed_updates, req.salts)
     return {"status": "verification_scheduled", "round_id": req.round_id}

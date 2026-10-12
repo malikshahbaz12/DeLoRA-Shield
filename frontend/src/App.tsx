@@ -114,8 +114,43 @@ export default function App() {
   const [isLive, setIsLive] = useState<boolean>(false);
   const [anvilBlock, setAnvilBlock] = useState<number | null>(null);
 
-  // Poll Daemon API with Fallback
+  // Connect to WebSocket /ws/radar with HTTP polling fallback
   useEffect(() => {
+    let ws: WebSocket | null = null;
+    let wsConnected = false;
+
+    try {
+      ws = new WebSocket("ws://127.0.0.1:8000/ws/radar");
+      ws.onopen = () => {
+        wsConnected = true;
+        setIsLive(true);
+      };
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data && data.nodes) {
+            setTelemetry((prev) => ({
+              ...prev,
+              current_round_id: data.round_id,
+              current_phase: data.phase,
+              lambda_1: data.lambda_1,
+              mad_threshold: data.mad_threshold,
+              spectral_energy_ratio: data.energy_ratio,
+              is_anomaly_detected: data.is_anomaly,
+              nodes: data.nodes
+            }));
+            setIsLive(true);
+          }
+        } catch {}
+      };
+      ws.onerror = () => {
+        wsConnected = false;
+      };
+      ws.onclose = () => {
+        wsConnected = false;
+      };
+    } catch {}
+
     const fetchTelemetry = async () => {
       try {
         const res = await fetch("http://127.0.0.1:8000/api/telemetry");
@@ -125,11 +160,8 @@ export default function App() {
             setTelemetry(data);
             setIsLive(true);
           }
-        } else {
-          setIsLive(false);
         }
 
-        // Check node/Anvil health
         try {
           const hRes = await fetch("http://127.0.0.1:8000/health");
           if (hRes.ok) {
@@ -138,17 +170,18 @@ export default function App() {
               setAnvilBlock(hData.anvil_block);
             }
           }
-        } catch {
-          // ignore health error
-        }
+        } catch {}
       } catch (err) {
-        setIsLive(false);
+        if (!wsConnected) setIsLive(false);
       }
     };
 
     fetchTelemetry();
     const interval = setInterval(fetchTelemetry, 2000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (ws) ws.close();
+    };
   }, []);
 
   const honestCount = (telemetry.nodes || []).filter(n => n.role === 'honest').length;
