@@ -1,0 +1,22 @@
+{
+  "num_nodes": 20,
+  "num_sybils": 8,
+  "num_honest": 12,
+  "sybil_ratio": 0.4,
+  "parameter_dimension": 10000,
+  "fedavg": {
+    "clean_accuracy": 1.0,
+    "backdoor_asr": 1.0,
+    "vulnerable": true
+  },
+  "delora_shield": {
+    "clean_accuracy": 1.0,
+    "backdoor_asr": 0.0,
+    "lambda_1": 0.3794534764659607,
+    "mad_threshold": 0.0034,
+    "precision": 1.0,
+    "recall": 1.0,
+    "false_positives": 0,
+    "execution_time_seconds": 0.001811
+  }
+}
