@@ -91,7 +91,7 @@ contract StakingVault is Ownable, ReentrancyGuard {
         emit StakeWithdrawn(msg.sender, amount);
     }
 
-    function slash(address badNode, address reporter) external onlySlashingEngine nonReentrant returns (uint256) {
+    function slash(address badNode, address reporter) external nonReentrant onlySlashingEngine returns (uint256) {
         StakeInfo storage info = stakes[badNode];
         require(info.status == StakeStatus.ACTIVE, "Node not active or already slashed");
 

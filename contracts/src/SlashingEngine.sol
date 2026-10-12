@@ -61,7 +61,7 @@ contract SlashingEngine is Ownable, ReentrancyGuard {
         address[] calldata badNodes,
         address[] calldata honestNodes,
         bytes calldata proofData
-    ) external onlyVerifier nonReentrant {
+    ) external nonReentrant onlyVerifier {
         require(badNodes.length > 0, "No bad nodes provided");
         require(proofData.length > 0, "Proof data required");
 
