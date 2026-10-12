@@ -15,7 +15,7 @@ Objective:
 
 import os
 import hashlib
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Any
 import numpy as np
 from web3 import Web3
 

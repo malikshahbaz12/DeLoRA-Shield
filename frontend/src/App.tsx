@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { NodeClusterCanvas } from './components/NodeClusterCanvas';
 import { SpectralGauge } from './components/SpectralGauge';
+import { ScreeVisualizer } from './components/ScreeVisualizer';
 import { SlashingLogs } from './components/SlashingLogs';
 import { TelemetryData, NodeTelemetry } from './types/telemetry';
 import { Shield, Database, Users, AlertOctagon } from 'lucide-react';
@@ -11,6 +12,9 @@ const FALLBACK_TELEMETRY: TelemetryData = {
   current_phase: 'Verification',
   global_loss: 0.384,
   spectral_energy_ratio: 0.842,
+  lambda_1: 0.2655,
+  mad_threshold: 0.0708,
+  singular_values: [0.2655, 0.0821, 0.0654, 0.0521, 0.0411, 0.0321, 0.0245, 0.0189],
   svd_threshold: 0.75,
   temporal_threshold: 0.85,
   is_anomaly_detected: true,
@@ -249,6 +253,15 @@ export default function App() {
             </div>
           </div>
         </div>
+
+        {/* Eigenspectrum & Scree Analysis */}
+        <ScreeVisualizer
+          singularValues={telemetry.singular_values || []}
+          lambda1={telemetry.lambda_1 ?? 0.2655}
+          madThreshold={telemetry.mad_threshold ?? 0.0708}
+          isAnomaly={telemetry.is_anomaly_detected}
+          energyRatio={telemetry.spectral_energy_ratio}
+        />
 
         {/* Bottom Section: Slashing Logs Feed */}
         <div className="h-[400px]">
