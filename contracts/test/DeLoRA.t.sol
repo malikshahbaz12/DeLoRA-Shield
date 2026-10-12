@@ -15,8 +15,10 @@ contract DeLoRATest is Test {
 
     address public owner = address(this);
     address public honestWorker = address(0x1111);
+    address public honestWorker2 = address(0x1112);
     address public sybilWorker = address(0x2222);
     address public engineVerifier = address(0x3333);
+    address public constant BURN_ADDRESS = address(0x000000000000000000000000000000000000dEaD);
 
     uint256 public constant MIN_STAKE = 100 * 10**18;
 
@@ -33,6 +35,7 @@ contract DeLoRATest is Test {
 
         // Fund test workers with DLRA tokens
         token.mint(honestWorker, 1000 * 10**18);
+        token.mint(honestWorker2, 1000 * 10**18);
         token.mint(sybilWorker, 1000 * 10**18);
     }
 
@@ -43,33 +46,52 @@ contract DeLoRATest is Test {
         assertEq(slashing.authorizedVerifier(), engineVerifier);
     }
 
-    function test_StakingLifecycle() public {
+    function test_StakingLifecycle_And_PrematureWithdrawalReverts() public {
         vm.startPrank(honestWorker);
         token.approve(address(vault), MIN_STAKE);
         vault.depositStake(MIN_STAKE);
-        vm.stopPrank();
 
         assertTrue(vault.isNodeStaked(honestWorker));
         assertEq(vault.getStake(honestWorker), MIN_STAKE);
         assertEq(vault.getActiveStakersCount(), 1);
+
+        // Lock stake for active round (simulate coordinator lock)
+        vm.stopPrank();
+        vm.prank(address(coordinator));
+        vault.lockNodeStake(honestWorker, 3600);
+
+        // Attempt premature withdrawal during active lock -> must revert
+        vm.prank(honestWorker);
+        vm.expectRevert("Stake currently locked in round");
+        vault.withdrawStake(MIN_STAKE);
+
+        // Fast-forward past lock duration
+        vm.warp(block.timestamp + 3601);
+
+        // Now withdrawal must succeed
+        vm.prank(honestWorker);
+        vault.withdrawStake(MIN_STAKE);
+        assertEq(vault.getStake(honestWorker), 0);
+        assertFalse(vault.isNodeStaked(honestWorker));
     }
 
-    function test_CommitReveal_Success() public {
+    function test_FullStateFlow_Commit_Reveal_Verifying_Finalized() public {
         // Stake honest worker
         vm.startPrank(honestWorker);
         token.approve(address(vault), MIN_STAKE);
         vault.depositStake(MIN_STAKE);
         vm.stopPrank();
 
-        // Start Round as engine verifier
+        // 1. Initialize Round -> COMMIT
         vm.prank(engineVerifier);
-        coordinator.startNewRound(300, 300); // 300s commit, 300s reveal
+        coordinator.startNewRound(300, 300);
+        assertEq(uint256(coordinator.getRoundPhase(1)), uint256(RoundCoordinator.Phase.COMMIT));
 
         string memory ipfsCID = "QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco";
         bytes32 salt = keccak256(abi.encodePacked("secret_salt_123"));
         bytes32 commitmentHash = keccak256(abi.encodePacked(ipfsCID, salt));
 
-        // Submit commitment
+        // Submit commitment during COMMIT window
         vm.prank(honestWorker);
         coordinator.submitCommitment(commitmentHash);
 
@@ -77,17 +99,68 @@ contract DeLoRATest is Test {
         assertEq(recordedHash, commitmentHash);
         assertFalse(revealedBefore);
 
-        // Advance to Reveal phase
+        // Replay prevention: duplicate commitment must revert
+        vm.prank(honestWorker);
+        vm.expectRevert("Commitment already submitted");
+        coordinator.submitCommitment(commitmentHash);
+
+        // 2. Advance to REVEAL
         vm.prank(engineVerifier);
         coordinator.advanceToReveal();
+        assertEq(uint256(coordinator.getRoundPhase(1)), uint256(RoundCoordinator.Phase.REVEAL));
 
-        // Reveal with preimage
+        // Reveal with valid preimage
         vm.prank(honestWorker);
         coordinator.revealUpdate(ipfsCID, salt);
 
         (, string memory revealedCID, bool revealedAfter) = coordinator.getNodeSubmission(1, honestWorker);
         assertEq(revealedCID, ipfsCID);
         assertTrue(revealedAfter);
+
+        // Replay prevention: duplicate reveal must revert
+        vm.prank(honestWorker);
+        vm.expectRevert("Update already revealed");
+        coordinator.revealUpdate(ipfsCID, salt);
+
+        // 3. Advance to VERIFYING
+        vm.prank(engineVerifier);
+        coordinator.advanceToVerifying();
+        assertEq(uint256(coordinator.getRoundPhase(1)), uint256(RoundCoordinator.Phase.VERIFYING));
+
+        // 4. Finalize Round -> FINALIZED
+        string memory globalCID = "QmGlobalAggregatedModelCID";
+        vm.prank(engineVerifier);
+        coordinator.finalizeRound(globalCID);
+        assertEq(uint256(coordinator.getRoundPhase(1)), uint256(RoundCoordinator.Phase.FINALIZED));
+    }
+
+    function test_MissingReveal_TransitionsToTimeout_NotSlashed() public {
+        // Stake honest worker
+        vm.startPrank(honestWorker);
+        token.approve(address(vault), MIN_STAKE);
+        vault.depositStake(MIN_STAKE);
+        vm.stopPrank();
+
+        vm.prank(engineVerifier);
+        coordinator.startNewRound(300, 300);
+
+        bytes32 commitmentHash = keccak256(abi.encodePacked("QmCID", "salt"));
+        vm.prank(honestWorker);
+        coordinator.submitCommitment(commitmentHash);
+
+        // Advance to REVEAL, but honest worker fails to reveal (e.g. network dropped)
+        vm.prank(engineVerifier);
+        coordinator.advanceToReveal();
+
+        // Advance past reveal deadline to VERIFYING
+        vm.warp(block.timestamp + 301);
+        vm.prank(engineVerifier);
+        coordinator.advanceToVerifying();
+
+        // Node is marked as timed out, NOT slashed!
+        assertTrue(coordinator.isNodeTimedOut(1, honestWorker));
+        assertTrue(vault.isNodeStaked(honestWorker));
+        assertEq(vault.getStake(honestWorker), MIN_STAKE);
     }
 
     function test_CommitReveal_HashMismatch_Reverts() public {
@@ -109,14 +182,14 @@ contract DeLoRATest is Test {
         vm.prank(engineVerifier);
         coordinator.advanceToReveal();
 
-        // Reveal with incorrect salt
+        // Reveal with incorrect preimage
         bytes32 wrongSalt = keccak256(abi.encodePacked("wrong_salt"));
         vm.prank(honestWorker);
         vm.expectRevert("Hash mismatch with pre-reveal commitment");
         coordinator.revealUpdate(ipfsCID, wrongSalt);
     }
 
-    function test_Slashing_BurnAndRedistribute() public {
+    function test_Slashing_BurnAndRedistribute_And_GasBound() public {
         // Stake honest worker and sybil worker
         vm.startPrank(honestWorker);
         token.approve(address(vault), MIN_STAKE);
@@ -137,22 +210,55 @@ contract DeLoRATest is Test {
         bytes memory proofData = abi.encode("SVD_SPECTRAL_EIGENVALUE_SPIKE:E=0.88,COSSIM=0.97");
 
         uint256 honestBalanceBefore = token.balanceOf(honestWorker);
-        uint256 burnBalanceBefore = token.balanceOf(address(0x000000000000000000000000000000000000dEaD));
+        uint256 burnBalanceBefore = token.balanceOf(BURN_ADDRESS);
 
-        // Execute slashing by authorized verifier
+        // Measure gas of the slash event execution
         vm.prank(engineVerifier);
+        uint256 gasStart = gasleft();
         slashing.slashMaliciousNodes(badNodes, honestNodes, proofData);
+        uint256 gasUsed = gasStart - gasleft();
+
+        // VERIFICATION GATE ASSERTION: Gas must be strictly under 250,000 gas
+        assertTrue(gasUsed < 250000);
 
         // Sybil should have 0 stake left and be marked slashed
         assertEq(vault.getStake(sybilWorker), 0);
         assertFalse(vault.isNodeStaked(sybilWorker));
 
-        // Check 50% burned (50 DLRA) and 50% rewarded to honest worker (50 DLRA)
+        // Token Accounting Invariants: 100% confiscated, 50% burned, 50% rewarded
         uint256 expectedBurn = MIN_STAKE / 2;
         uint256 expectedReward = MIN_STAKE - expectedBurn;
 
-        assertEq(token.balanceOf(address(0x000000000000000000000000000000000000dEaD)) - burnBalanceBefore, expectedBurn);
+        assertEq(token.balanceOf(BURN_ADDRESS) - burnBalanceBefore, expectedBurn);
         assertEq(token.balanceOf(honestWorker) - honestBalanceBefore, expectedReward);
+    }
+
+    function test_SlashingReplayAttack_Reverts() public {
+        // Stake honest worker and sybil worker
+        vm.startPrank(honestWorker);
+        token.approve(address(vault), MIN_STAKE);
+        vault.depositStake(MIN_STAKE);
+        vm.stopPrank();
+
+        vm.startPrank(sybilWorker);
+        token.approve(address(vault), MIN_STAKE);
+        vault.depositStake(MIN_STAKE);
+        vm.stopPrank();
+
+        address[] memory badNodes = new address[](1);
+        badNodes[0] = sybilWorker;
+        address[] memory honestNodes = new address[](1);
+        honestNodes[0] = honestWorker;
+        bytes memory proofData = abi.encode("SVD_PROOF");
+
+        // First slashing execution -> succeeds
+        vm.prank(engineVerifier);
+        slashing.slashMaliciousNodes(badNodes, honestNodes, proofData);
+
+        // Replay attack: calling slash on the already slashed node -> must revert
+        vm.prank(engineVerifier);
+        vm.expectRevert("Zero tokens slashed");
+        slashing.slashMaliciousNodes(badNodes, honestNodes, proofData);
     }
 
     function test_UnauthorizedVerifier_Reverts() public {

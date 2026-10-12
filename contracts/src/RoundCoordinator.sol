@@ -6,13 +6,22 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title RoundCoordinator
- * @notice Manages commit-reveal state machine phases for collaborative LoRA training.
+ * @notice Enforces commit-reveal state machine phases for collaborative LoRA training:
+ * COMMIT -> REVEAL -> VERIFYING -> FINALIZED.
+ * Handles timeouts where missing reveals transition to a non-slashing protocol timeout.
  */
 contract RoundCoordinator is Ownable {
     StakingVault public immutable stakingVault;
     address public authorizedEngine;
 
-    enum Phase { Commit, Reveal, Verification, Complete }
+    // Structured Round States
+    enum Phase { COMMIT, REVEAL, VERIFYING, FINALIZED }
+
+    // Backward-compatible alias getters
+    Phase public constant Commit = Phase.COMMIT;
+    Phase public constant Reveal = Phase.REVEAL;
+    Phase public constant Verification = Phase.VERIFYING;
+    Phase public constant Complete = Phase.FINALIZED;
 
     struct CommitmentRecord {
         bytes32 commitmentHash;
@@ -39,6 +48,7 @@ contract RoundCoordinator is Ownable {
     event PhaseAdvanced(uint256 indexed roundId, Phase newPhase);
     event CommitmentRecorded(uint256 indexed roundId, address indexed node, bytes32 commitmentHash);
     event UpdateRevealed(uint256 indexed roundId, address indexed node, string ipfsHash);
+    event RevealTimedOut(uint256 indexed roundId, address indexed node);
     event GlobalModelPublished(uint256 indexed roundId, string globalModelCID);
 
     modifier onlyAuthorizedEngine() {
@@ -58,22 +68,25 @@ contract RoundCoordinator is Ownable {
 
     function startNewRound(uint256 commitDuration, uint256 revealDuration) external onlyAuthorizedEngine {
         if (currentRoundId > 0) {
-            require(rounds[currentRoundId].currentPhase == Phase.Complete, "Previous round not complete");
+            require(rounds[currentRoundId].currentPhase == Phase.FINALIZED, "Previous round not finalized");
         }
 
         currentRoundId++;
         RoundInfo storage round = rounds[currentRoundId];
         round.roundId = currentRoundId;
-        round.currentPhase = Phase.Commit;
+        round.currentPhase = Phase.COMMIT;
         round.commitDeadline = block.timestamp + commitDuration;
         round.revealDeadline = block.timestamp + commitDuration + revealDuration;
 
         emit RoundInitialized(currentRoundId, round.commitDeadline, round.revealDeadline);
     }
 
+    /**
+     * @notice Stores client commitments computed as keccak256(canonical_weights || salt).
+     */
     function submitCommitment(bytes32 commitmentHash) external {
         RoundInfo storage round = rounds[currentRoundId];
-        require(round.currentPhase == Phase.Commit, "Not in Commit phase");
+        require(round.currentPhase == Phase.COMMIT, "Not in COMMIT phase");
         require(block.timestamp <= round.commitDeadline, "Commit deadline passed");
         require(stakingVault.isNodeStaked(msg.sender), "Node not staked with required collateral");
 
@@ -83,7 +96,7 @@ contract RoundCoordinator is Ownable {
         record.commitmentHash = commitmentHash;
         round.participatingNodes.push(msg.sender);
 
-        // Lock stake for duration of round
+        // Lock stake for the duration of the round
         uint256 totalRoundDuration = round.revealDeadline - block.timestamp + 3600;
         stakingVault.lockNodeStake(msg.sender, totalRoundDuration);
 
@@ -92,16 +105,19 @@ contract RoundCoordinator is Ownable {
 
     function advanceToReveal() external {
         RoundInfo storage round = rounds[currentRoundId];
-        require(round.currentPhase == Phase.Commit, "Must be in Commit phase");
-        require(block.timestamp > round.commitDeadline || msg.sender == authorizedEngine, "Commit deadline not reached");
+        require(round.currentPhase == Phase.COMMIT, "Must be in COMMIT phase");
+        require(block.timestamp > round.commitDeadline || msg.sender == authorizedEngine || msg.sender == owner(), "Commit deadline not reached");
 
-        round.currentPhase = Phase.Reveal;
-        emit PhaseAdvanced(currentRoundId, Phase.Reveal);
+        round.currentPhase = Phase.REVEAL;
+        emit PhaseAdvanced(currentRoundId, Phase.REVEAL);
     }
 
+    /**
+     * @notice Validates preimages against stored commitment hashes and records revealed storage pointers.
+     */
     function revealUpdate(string calldata ipfsHash, bytes32 salt) external {
         RoundInfo storage round = rounds[currentRoundId];
-        require(round.currentPhase == Phase.Reveal, "Not in Reveal phase");
+        require(round.currentPhase == Phase.REVEAL, "Not in REVEAL phase");
         require(block.timestamp <= round.revealDeadline, "Reveal deadline passed");
 
         CommitmentRecord storage record = nodeCommitments[currentRoundId][msg.sender];
@@ -119,24 +135,49 @@ contract RoundCoordinator is Ownable {
         emit UpdateRevealed(currentRoundId, msg.sender, ipfsHash);
     }
 
-    function advanceToVerification() external onlyAuthorizedEngine {
+    /**
+     * @notice Transitions from REVEAL to VERIFYING.
+     * Enforces strict timeouts: missing reveals transition to a non-slashing protocol timeout.
+     */
+    function advanceToVerifying() public onlyAuthorizedEngine {
         RoundInfo storage round = rounds[currentRoundId];
-        require(round.currentPhase == Phase.Reveal, "Must be in Reveal phase");
-        require(block.timestamp > round.revealDeadline || msg.sender == authorizedEngine, "Reveal deadline not reached");
+        require(round.currentPhase == Phase.REVEAL, "Must be in REVEAL phase");
+        require(block.timestamp > round.revealDeadline || msg.sender == authorizedEngine || msg.sender == owner(), "Reveal deadline not reached");
 
-        round.currentPhase = Phase.Verification;
-        emit PhaseAdvanced(currentRoundId, Phase.Verification);
+        // Record protocol timeouts for any node that failed to reveal
+        for (uint256 i = 0; i < round.participatingNodes.length; i++) {
+            address node = round.participatingNodes[i];
+            if (!nodeCommitments[currentRoundId][node].revealed) {
+                emit RevealTimedOut(currentRoundId, node);
+            }
+        }
+
+        round.currentPhase = Phase.VERIFYING;
+        emit PhaseAdvanced(currentRoundId, Phase.VERIFYING);
     }
 
-    function completeRound(string calldata globalModelCID) external onlyAuthorizedEngine {
+    // Alias for backward compatibility
+    function advanceToVerification() external onlyAuthorizedEngine {
+        advanceToVerifying();
+    }
+
+    /**
+     * @notice Publishes global model CID and marks round as FINALIZED.
+     */
+    function finalizeRound(string calldata globalModelCID) public onlyAuthorizedEngine {
         RoundInfo storage round = rounds[currentRoundId];
-        require(round.currentPhase == Phase.Verification, "Must be in Verification phase");
+        require(round.currentPhase == Phase.VERIFYING, "Must be in VERIFYING phase");
 
         round.globalModelCID = globalModelCID;
-        round.currentPhase = Phase.Complete;
+        round.currentPhase = Phase.FINALIZED;
 
         emit GlobalModelPublished(currentRoundId, globalModelCID);
-        emit PhaseAdvanced(currentRoundId, Phase.Complete);
+        emit PhaseAdvanced(currentRoundId, Phase.FINALIZED);
+    }
+
+    // Alias for backward compatibility
+    function completeRound(string calldata globalModelCID) external onlyAuthorizedEngine {
+        finalizeRound(globalModelCID);
     }
 
     function getRevealedNodes(uint256 roundId) external view returns (address[] memory) {
@@ -147,8 +188,25 @@ contract RoundCoordinator is Ownable {
         return rounds[roundId].participatingNodes;
     }
 
-    function getNodeSubmission(uint256 roundId, address node) external view returns (bytes32 commitmentHash, string memory ipfsHash, bool revealed) {
-        CommitmentRecord storage record = nodeCommitments[roundId][node];
+    function getNodeSubmission(uint256 roundId, address node) external view returns (
+        bytes32 commitmentHash,
+        string memory ipfsHash,
+        bool revealed
+    ) {
+        CommitmentRecord memory record = nodeCommitments[roundId][node];
         return (record.commitmentHash, record.ipfsHash, record.revealed);
+    }
+
+    function isNodeTimedOut(uint256 roundId, address node) external view returns (bool) {
+        RoundInfo storage round = rounds[roundId];
+        if (round.currentPhase == Phase.COMMIT) {
+            return false;
+        }
+        CommitmentRecord memory record = nodeCommitments[roundId][node];
+        return (record.commitmentHash != bytes32(0) && !record.revealed);
+    }
+
+    function getRoundPhase(uint256 roundId) external view returns (Phase) {
+        return rounds[roundId].currentPhase;
     }
 }
