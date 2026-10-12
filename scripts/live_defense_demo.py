@@ -201,6 +201,15 @@ def execute_spectral_defense_and_slashing(round_id, honest_nodes, sybil_nodes, r
     process_round_verification(round_id=round_id, revealed_updates=revealed_files)
     elapsed = time.perf_counter() - t_start
 
+    # Synchronize background daemon serving frontend
+    try:
+        payload = json.dumps({'round_id': round_id, 'revealed_updates': revealed_files}).encode('utf-8')
+        req = urllib.request.Request('http://127.0.0.1:8000/api/rounds/process', data=payload, headers={'Content-Type': 'application/json'})
+        urllib.request.urlopen(req, timeout=3)
+        time.sleep(0.5)
+    except Exception:
+        pass
+
     print(f"  [+] Spectral SVD Execution Time:   {elapsed:.4f} seconds (< 2.0s Gate: PASS)")
     print(f"  [+] Dominant Eigenvalue (λ₁):      {telemetry_state['lambda_1']:.4f}")
     print(f"  [+] Dynamic Cutoff Threshold (τ): {telemetry_state['mad_threshold']:.4f}")
