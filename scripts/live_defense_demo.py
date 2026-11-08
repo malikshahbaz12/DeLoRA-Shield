@@ -83,8 +83,8 @@ def setup_participant_stakes():
     log_step(2, "On-Chain Collateral Staking", "Depositing ERC-20 collateral in StakingVault.sol for active nodes...")
     reset_nonce()
 
-    token_addr = os.getenv("MOCK_TOKEN_ADDRESS", "0x67d269191c92Caf3cD7723F116c85e6E9bf55933")
-    vault_addr = os.getenv("STAKING_VAULT_ADDRESS", "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E")
+    token_addr = os.getenv("MOCK_TOKEN_ADDRESS", "0x5FbDB2315678afecb367f032d93F642f64180aa3")
+    vault_addr = os.getenv("STAKING_VAULT_ADDRESS", "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512")
 
     token_abi = [
         {'inputs': [{'name': 'to', 'type': 'address'}, {'name': 'amount', 'type': 'uint256'}], 'name': 'transfer', 'outputs': [{'name': '', 'type': 'bool'}], 'stateMutability': 'nonpayable', 'type': 'function'},

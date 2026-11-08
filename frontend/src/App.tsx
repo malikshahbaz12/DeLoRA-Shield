@@ -308,7 +308,7 @@ export default function App() {
             false_positive_identification_rate: "0.0%"
           },
           onchain_slashing_proof: {
-            slashing_contract: "0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB",
+            slashing_contract: import.meta.env.VITE_SLASHING_ENGINE_ADDRESS || "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
             chain_id: 31337,
             standard: "EIP-712 Typed Structured Data",
             settlement_burn_ratio: "50% Burned to address(0xdead), 50% Staking Bounty to Honest Set"
